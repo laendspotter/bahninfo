@@ -562,3 +562,125 @@ body {
   .gleis-time { font-size: 28px; }
   .gleis-dest { font-size: 18px; }
 }
+
+/* ─── BIGBOARD (DB Tafel Design) ─────────────────────────────────────── */
+.bigboard {
+  background: #003189;
+  color: #fff;
+  font-family: 'DB Screen Sans', 'Helvetica Neue', Arial, sans-serif;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.bb-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid #1a4aab;
+}
+
+.bb-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #aac0f0;
+}
+
+.bb-station {
+  font-size: 20px;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.bb-clock {
+  font-size: 32px;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 0.05em;
+}
+
+.bb-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px;
+  background: #002070;
+  border-bottom: 1px solid #1a4aab;
+}
+
+.bb-tab {
+  background: transparent;
+  border: 1px solid #3a5adb;
+  color: #aac0f0;
+  padding: 5px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+
+.bb-tab.active, .bb-tab:hover {
+  background: #1a4aab;
+  color: #fff;
+}
+
+/* Spaltenköpfe */
+.bb-cols {
+  display: grid;
+  grid-template-columns: 90px 100px 1fr 180px 60px;
+  gap: 0;
+  padding: 6px 20px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #aac0f0;
+  border-bottom: 1px solid #1a4aab;
+}
+
+.bb-col-track { text-align: right; }
+
+/* Zeilen */
+.bb-row {
+  display: grid;
+  grid-template-columns: 90px 100px 1fr 180px 60px;
+  gap: 0;
+  padding: 9px 20px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  align-items: center;
+  transition: background 0.1s;
+}
+
+.bb-row:hover { background: rgba(255,255,255,0.04); }
+.bb-cancelled { opacity: 0.45; }
+
+.bb-col-time { display: flex; flex-direction: column; gap: 1px; }
+
+.bb-time { font-size: 16px; font-weight: 700; font-family: monospace; }
+.bb-time-old { font-size: 11px; color: #aac0f0; text-decoration: line-through; }
+.bb-time-new { font-size: 16px; }
+.bb-time-new.slight { color: #f5c518; }
+.bb-time-new.heavy  { color: #ff6b6b; }
+.bb-cancelled-time  { color: #ff6b6b; }
+
+.bb-col-zug  { display: flex; align-items: center; }
+.bb-col-via  { font-size: 11px; color: #aac0f0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+.bb-col-dest { font-size: 15px; font-weight: 600; display: flex; flex-direction: column; gap: 2px; }
+.bb-col-track { text-align: right; font-size: 18px; font-weight: 700; font-family: monospace; }
+
+.bb-track-changed { color: #ff6b6b; }
+.bb-ausfall { font-size: 11px; color: #ff9090; font-weight: 400; }
+
+/* Vollbild */
+body.fullscreen-mode .bigboard {
+  border-radius: 0;
+  min-height: 100vh;
+}
+
+@media (max-width: 640px) {
+  .bb-cols, .bb-row {
+    grid-template-columns: 70px 80px 0 1fr 45px;
+  }
+  .bb-col-via { display: none; }
+  .bb-clock { font-size: 22px; }
+}
