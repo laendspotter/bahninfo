@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: '/api/proxy/:path*',
-        destination: 'https://v5.db.transport.rest/:path*',
+        destination: 'https://v6.db.transport.rest/:path*',
       },
     ];
   },
