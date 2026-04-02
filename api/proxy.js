@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   const { path, ...rest } = req.query;
   if (!path) return res.status(400).json({ error: 'no path' });
   const params = new URLSearchParams(rest).toString();
