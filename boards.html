@@ -8,12 +8,13 @@
 </head>
 <body>
   <div id="app-header"></div>
-  <div class="container">
-    <div class="search-row">
+  <div class="container" id="main-container">
+    <div class="search-row" id="search-row">
       <input class="search-input" id="boards-input" type="text"
         placeholder="Bahnhof eingeben… z.B. Stuttgart Hbf, Freudenstadt"
         onkeydown="if(event.key==='Enter') loadBoards()">
       <button class="btn" onclick="loadBoards()">Laden</button>
+      <button class="btn btn-outline" onclick="toggleFullscreen()" title="Vollbild">⛶</button>
     </div>
     <div id="boards-result"></div>
   </div>
