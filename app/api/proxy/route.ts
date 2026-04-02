@@ -13,10 +13,16 @@ export async function GET(req: NextRequest) {
   const url = `${BASE}/${path}${params.toString() ? '?' + params.toString() : ''}`;
 
   try {
-    const r = await fetch(url, { headers: { 'User-Agent': 'bahninfo/1.0' }, next: { revalidate: 0 } });
-    const data = await r.json();
-    return NextResponse.json(data, { status: r.status });
+    const r = await fetch(url, { headers: { 'User-Agent': 'bahninfo/1.0' }, cache: 'no-store' });
+    const text = await r.text();
+    console.log('proxy', r.status, url, text.substring(0, 300));
+    try {
+      return NextResponse.json(JSON.parse(text), { status: r.status });
+    } catch {
+      return NextResponse.json({ error: 'parse error', body: text.substring(0, 300) }, { status: 500 });
+    }
   } catch(e: any) {
+    console.error('fetch error:', e.message, url);
     return NextResponse.json({ error: e.message }, { status: 500 });
   }
 }
