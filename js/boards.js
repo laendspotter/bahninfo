@@ -1,14 +1,18 @@
+// Produkte die NICHT angezeigt werden
+const HIDDEN = new Set(['subway','bus','taxi','tram','ferry']);
+
+let currentStation = null;
 let currentDeps = [];
-let currentLevel = 'all'; // 'all' | 'high' | 'low'
+let currentLevel = 'all';
 let clockInterval = null;
 let refreshInterval = null;
+let isFullscreen = false;
 
 function startClock() {
   if (clockInterval) clearInterval(clockInterval);
-  const el = document.getElementById('board-clock');
-  if (!el) return;
   const tick = () => {
-    el.textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const el = document.getElementById('board-clock');
+    if (el) el.textContent = new Date().toLocaleTimeString('de-DE', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
   };
   tick();
   clockInterval = setInterval(tick, 1000);
@@ -23,137 +27,141 @@ async function loadBoards() {
   try {
     const stations = await searchStation(query);
     if (!stations.length) { showError(el, 'Bahnhof nicht gefunden'); return; }
-    const station = stations[0];
+    currentStation = stations[0];
 
-    showLoading(el, 'Abfahrten laden…');
-    const deps = await getDepartures(station.id, { results: 80, duration: 90 });
-
-    currentDeps = deps;
-    renderBoards(station, deps);
+    await refresh();
 
     if (refreshInterval) clearInterval(refreshInterval);
-    refreshInterval = setInterval(async () => {
-      const fresh = await getDepartures(station.id, { results: 80, duration: 90 });
-      currentDeps = fresh;
-      renderBoards(station, fresh);
-    }, 30000);
-
-  } catch (e) {
-    showError(el, 'Fehler: ' + e.message);
-  }
+    refreshInterval = setInterval(refresh, 30000);
+  } catch(e) { showError(el, e.message); }
 }
 
-function renderBoards(station, deps) {
+async function refresh() {
+  if (!currentStation) return;
+  const deps = await getDepartures(currentStation.id, { results: 80, duration: 120 });
+  // U-Bahn, Bus etc. rausfiltern
+  currentDeps = deps.filter(d => !HIDDEN.has(d.line?.product));
+  render();
+}
+
+function detectLevels() {
+  const hasTop  = currentDeps.some(d => { const n=parseInt(d.plannedPlatform||d.platform||''); return n>=1 && n<100; });
+  const hasDeep = currentDeps.some(d => { const n=parseInt(d.plannedPlatform||d.platform||''); return n>=100; });
+  return hasTop && hasDeep;
+}
+
+function render() {
   const el = document.getElementById('boards-result');
-  const levels = detectLevels(deps);
+  if (!currentStation) return;
 
-  // Level-Filter
-  let filtered = deps;
-  if (currentLevel === 'high') filtered = deps.filter(d => {
-    const n = parseInt(d.plannedPlatform || d.platform || '0');
-    return !isNaN(n) && n >= 1 && n <= 50;
-  });
-  if (currentLevel === 'low') filtered = deps.filter(d => {
-    const n = parseInt(d.plannedPlatform || d.platform || '0');
-    return !isNaN(n) && n >= 100;
-  });
+  const hasBoth = detectLevels();
+  let deps = currentDeps;
+  if (currentLevel === 'top')  deps = currentDeps.filter(d => { const n=parseInt(d.plannedPlatform||d.platform||''); return n<100; });
+  if (currentLevel === 'deep') deps = currentDeps.filter(d => { const n=parseInt(d.plannedPlatform||d.platform||''); return n>=100; });
 
-  let html = `
-    <div class="board-container">
-      <div class="board-station-header">
-        <div>
-          <div class="board-station-name">${station.name}</div>
-          <div style="font-family:var(--mono);font-size:11px;color:#aabbdd;margin-top:2px">
-            <span class="live-dot"></span>Echtzeit
-          </div>
-        </div>
-        <div class="board-clock" id="board-clock"></div>
+  const city = detectCity(currentStation.id, currentStation.name);
+
+  let html = `<div class="bigboard" id="bigboard">
+    <div class="bb-header">
+      <div class="bb-left">
+        <div class="bb-title">Abfahrt <span style="font-size:0.6em;opacity:0.6">Departure</span></div>
+        <div class="bb-station">${currentStation.name}</div>
       </div>
-  `;
+      <div class="bb-clock" id="board-clock"></div>
+    </div>`;
 
-  // Level-Tabs nur wenn beide vorhanden
-  if (levels.hasBoth) {
-    html += `
-      <div class="board-level-tabs">
-        <button class="btn-ghost ${currentLevel === 'all'  ? 'active' : ''}" onclick="setLevel('all')">Alle Gleise</button>
-        <button class="btn-ghost ${currentLevel === 'high' ? 'active' : ''}" onclick="setLevel('high')">Kopfbahnhof (1–16)</button>
-        <button class="btn-ghost ${currentLevel === 'low'  ? 'active' : ''}" onclick="setLevel('low')">S-Bahn tief (101–102)</button>
-      </div>
-    `;
+  // Level-Tabs
+  if (hasBoth) {
+    html += `<div class="bb-tabs">
+      <button class="bb-tab ${currentLevel==='all'?'active':''}" onclick="setLevel('all')">Alle Gleise</button>
+      <button class="bb-tab ${currentLevel==='top'?'active':''}" onclick="setLevel('top')">🔝 Kopfbahnhof</button>
+      <button class="bb-tab ${currentLevel==='deep'?'active':''}" onclick="setLevel('deep')">🔽 Tief</button>
+    </div>`;
   }
 
-  html += `
-    <div class="board-col-headers">
-      <div>Abfahrt</div>
-      <div>Linie</div>
-      <div>Ziel / Via</div>
-      <div style="text-align:center">Gleis</div>
-      <div style="text-align:right">Status</div>
-    </div>
-  `;
+  // Spaltenköpfe wie echte Tafel
+  html += `<div class="bb-cols">
+    <div>Zeit</div>
+    <div>Zug</div>
+    <div>Über / Via</div>
+    <div>Ziel / Destination</div>
+    <div class="bb-col-track">Gleis</div>
+  </div>`;
 
-  if (!filtered.length) {
-    html += `<div class="empty">Keine Abfahrten</div>`;
-  } else {
-    for (const dep of filtered.slice(0, 40)) {
-      const delay = calcDelay(dep.plannedWhen, dep.when);
-      const cancelled = dep.cancelled;
-      const color = getLineColor(dep.line);
+  for (const dep of deps.slice(0, 30)) {
+    const cancelled = dep.cancelled;
+    const delay = calcDelay(dep.plannedWhen, dep.when);
+    const hasDelay = delay !== null && delay > 0;
 
-      const plannedStr = fmtTime(dep.plannedWhen);
-      const realStr    = dep.when ? fmtTime(dep.when) : null;
-      const hasDelay   = delay !== null && delay > 0;
+    const tPlanned = fmtTime(dep.plannedWhen);
+    const tReal    = dep.when ? fmtTime(dep.when) : null;
 
-      let delayClass = '';
-      if (delay !== null && delay > 5) delayClass = 'heavy';
-      else if (delay !== null && delay > 0) delayClass = 'slight';
+    const track = dep.platform || dep.plannedPlatform || '–';
+    const trackChanged = dep.platform && dep.platform !== dep.plannedPlatform;
 
-      const track = dep.platform || dep.plannedPlatform || '–';
-      const trackChanged = dep.platform && dep.platform !== dep.plannedPlatform;
+    // Via: nextstopovers ohne ersten (der ist der aktuelle halt)
+    const via = dep.nextStopovers
+      ?.slice(1, 5).map(s => s.stop?.name).filter(Boolean).join(' – ') || '';
 
-      // Via-Stops (erste 3)
-      const via = dep.nextStopovers?.slice(1, 4).map(s => s.stop?.name).filter(Boolean).join(' – ') || '';
+    const badge = linePill(dep.line, city);
 
-      html += `
-        <div class="board-row ${cancelled ? 'cancelled' : ''}">
-          <div class="board-time-col">
-            ${hasDelay && !cancelled
-              ? `<span class="time-planned has-delay">${plannedStr}</span>
-                 <span class="time-real ${delayClass}">${realStr}</span>`
-              : `<span class="time-planned">${plannedStr}</span>`
-            }
-          </div>
-          <div>${linePill(dep.line)}</div>
-          <div>
-            <div class="board-dest">${dep.direction || '–'}</div>
-            ${via ? `<div class="board-via">${via}</div>` : ''}
-          </div>
-          <div class="board-track ${trackChanged ? 'track-changed' : ''}" style="text-align:center">${track}</div>
-          <div class="board-status">
-            ${cancelled
-              ? `<span class="cancelled-text">Ausfall</span>`
-              : delayBadge(delay)
-            }
-          </div>
-        </div>
-      `;
+    let timeHtml = '';
+    if (cancelled) {
+      timeHtml = `<span class="bb-time bb-cancelled-time">${tPlanned}</span>`;
+    } else if (hasDelay) {
+      timeHtml = `<span class="bb-time bb-time-old">${tPlanned}</span><span class="bb-time bb-time-new ${delay>5?'heavy':'slight'}">${tReal}</span>`;
+    } else {
+      timeHtml = `<span class="bb-time">${tPlanned}</span>`;
     }
+
+    html += `<div class="bb-row ${cancelled?'bb-cancelled':''}">
+      <div class="bb-col-time">${timeHtml}</div>
+      <div class="bb-col-zug">${badge}</div>
+      <div class="bb-col-via">${via}</div>
+      <div class="bb-col-dest">${dep.direction||'–'}
+        ${cancelled ? '<span class="bb-ausfall">Zug fällt aus</span>' : ''}
+      </div>
+      <div class="bb-col-track ${trackChanged?'bb-track-changed':''}">${track}</div>
+    </div>`;
   }
 
-  html += `</div>`;
+  html += `</div>`; // bigboard
   el.innerHTML = html;
   startClock();
 }
 
 function setLevel(level) {
   currentLevel = level;
-  // Re-render mit aktuellen Daten
-  const query = document.getElementById('boards-input').value.trim();
-  if (currentDeps.length) {
-    // Station neu holen wäre aufwändig, einfach re-render
-    // station name aus header lesen
-    const nameEl = document.querySelector('.board-station-name');
-    const fakeSt = { name: nameEl?.textContent || query, id: null };
-    renderBoards(fakeSt, currentDeps);
+  render();
+}
+
+function toggleFullscreen() {
+  isFullscreen = !isFullscreen;
+  const header = document.getElementById('app-header');
+  const searchRow = document.getElementById('search-row');
+  const container = document.getElementById('main-container');
+
+  if (isFullscreen) {
+    header.style.display = 'none';
+    searchRow.style.display = 'none';
+    container.style.padding = '0';
+    container.style.maxWidth = '100%';
+    document.body.style.background = '#003189';
+    document.documentElement.requestFullscreen?.();
+  } else {
+    header.style.display = '';
+    searchRow.style.display = '';
+    container.style.padding = '';
+    container.style.maxWidth = '';
+    document.body.style.background = '';
+    document.exitFullscreen?.();
   }
 }
+
+document.addEventListener('fullscreenchange', () => {
+  if (!document.fullscreenElement && isFullscreen) {
+    isFullscreen = false;
+    toggleFullscreen(); // reset styles
+    isFullscreen = false;
+  }
+});
