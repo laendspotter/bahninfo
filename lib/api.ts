@@ -1,33 +1,28 @@
-const BASE = '/api/proxy';
-
-async function get(path: string, params: Record<string,string> = {}) {
-  const [pathname] = path.split('?');
-  const seg = pathname.replace(/^\//, '');
-  const qs = new URLSearchParams({ path: seg, ...params }).toString();
-  const res = await fetch(`${BASE}?${qs}`);
+async function get(path: string) {
+  const res = await fetch(`/api/proxy${path}`);
   if (!res.ok) throw new Error(`API ${res.status}`);
   return res.json();
 }
 
 export async function searchStation(query: string) {
-  const data = await get('/locations', { query, results: '5', stops: 'true', addresses: 'false', poi: 'false' });
+  const data = await get(`/locations?query=${encodeURIComponent(query)}&results=5&stops=true&addresses=false&poi=false`);
   return (data as any[]).filter(s => s.type === 'stop' || s.type === 'station');
 }
 
 export async function getDepartures(id: string, results = 60, duration = 90) {
-  const data = await get(`/stops/${id}/departures`, { results: String(results), duration: String(duration), language: 'de' });
+  const data = await get(`/stops/${id}/departures?results=${results}&duration=${duration}&language=de`);
   return (data.departures || data) as any[];
 }
 
 export async function searchTrips(query: string) {
   try {
-    const data = await get('/trips', { query, language: 'de' });
+    const data = await get(`/trips?query=${encodeURIComponent(query)}&language=de`);
     return (data.trips || []) as any[];
   } catch { return []; }
 }
 
 export async function getTripDetails(tripId: string) {
-  const data = await get(`/trips/${encodeURIComponent(tripId)}`, { stopovers: 'true', language: 'de' });
+  const data = await get(`/trips/${encodeURIComponent(tripId)}?stopovers=true&language=de`);
   return data.trip || data;
 }
 
