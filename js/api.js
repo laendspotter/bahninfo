@@ -1,7 +1,7 @@
 async function apiGet(path) {
   const [pathname, qs] = path.split('?');
   const seg = pathname.replace(/^\//, '');
-  const url = `/api/proxy?path=${encodeURIComponent(seg)}${qs ? '&' + qs : ''}`;
+  const url = `/api/proxy?path=${seg}${qs ? '&' + qs : ''}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
   return res.json();
