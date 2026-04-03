@@ -9,11 +9,6 @@ export async function searchStation(query: string) {
   return (data as any[]).filter(s => s.type === 'stop' || s.type === 'station');
 }
 
-export async function getDepartures(id: string, results = 60, duration = 90) {
-  const data = await get(`/stops/${id}/departures?results=${results}&duration=${duration}&language=de`);
-  return (data.departures || data) as any[];
-}
-
 export async function searchTrips(query: string) {
   try {
     const data = await get(`/trips?query=${encodeURIComponent(query)}&language=de`);
@@ -34,4 +29,9 @@ export function fmt(iso: string | null | undefined): string {
 export function delayMin(planned?: string, real?: string): number | null {
   if (!planned || !real) return null;
   return Math.round((new Date(real).getTime() - new Date(planned).getTime()) / 60000);
+}
+
+export async function getDepartures(id: string, results = 60, duration = 90) {
+  const data = await get(`/stops/${id}/departures?results=${results}&duration=${duration}&language=de&stopovers=true`);
+  return (data.departures || data) as any[];
 }
