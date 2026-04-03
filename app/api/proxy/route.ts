@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-const BASE = 'https://v5.db.transport.rest';
+const BASE = 'https://v6.db.transport.rest';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
