@@ -45,17 +45,29 @@ export function detectCity(id: string, name: string): string {
 
 export function getLineColor(line: any, city: string): {bg:string,text:string} {
   if (line?.color?.bg) return { bg: line.color.bg, text: line.color.fg || '#fff' };
+  
   const product = (line?.product || '').toLowerCase();
   const name = (line?.name || '').toUpperCase().replace(/\s/g,'');
+  const operator = (line?.operator?.name || '').toLowerCase();
+
+  // FlixTrain
+  if (operator.includes('flixtrain') || name.includes('FLX') || name.startsWith('FLX'))
+    return { bg: '#00d473', text: '#fff' };
+
   if (product === 'suburban') {
     const map = CITY_MAP[city] || {};
     const m = name.match(/S\d+/);
     if (m && map[m[0]]) return map[m[0]];
     return { bg: '#008D4F', text: '#fff' };
   }
-  if (product === 'ice' || product === 'ic' || product === 'ec' || product === 'nj')
-    return { bg: '#fff', text: '#1a1a1a' };
-  if (product === 're' || product === 'rb')
+
+  // Fernverkehr: weißes badge, schwarze schrift
+  if (product === 'ice' || product === 'ic' || product === 'ec' || product === 'nj' || product === 'ece' || product === 'rj' || product === 'rjx')
+    return { bg: '#ffffff', text: '#1a1a1a' };
+
+  // Nahverkehr: grau
+  if (product === 're' || product === 'rb' || product === 'regional')
     return { bg: '#6b6b6b', text: '#fff' };
+
   return { bg: '#444', text: '#fff' };
 }
