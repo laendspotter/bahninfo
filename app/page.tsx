@@ -3,6 +3,32 @@ import { useState, useEffect, useRef } from 'react';
 import { searchStation, getDepartures, fmt, delayMin } from '@/lib/api';
 import { detectCity, getLineColor, HIDDEN_PRODUCTS } from '@/lib/colors';
 
+type FontMode = 'default' | 'dbtype' | 'bahnschrift';
+
+function isRelevantStop(stop: any): boolean {
+  const id = stop?.stop?.id || '';
+  const num = parseInt(id.replace(/\D/g, ''), 10);
+
+  const whitelist = new Set([
+    '8000047','8000237','8003368','8000183','8000191',
+    '8000156','8005017','8000170','8000198','8000107',
+    '8000232','8000195','8000249','8003200','8000031',
+    '8000055','8000244','8000105','8000096','8000261',
+    '8011160','8000147','8000260','8000085','8000152',
+    '8000128','8000068','8000050','8000078','8000025',
+  ]);
+
+  if (whitelist.has(id)) return true;
+  if (!isNaN(num) && num < 8001000) return true;
+  return false;
+}
+
+const FONT_MAP: Record<FontMode, string> = {
+  default: '"Helvetica Neue", Arial, sans-serif',
+  dbtype: '"DB Type", "Helvetica Neue", Arial, sans-serif',
+  bahnschrift: '"Bahnschrift", "DB Type", Arial, sans-serif',
+};
+
 export default function Boards() {
   const [query, setQuery] = useState('');
   const [station, setStation] = useState<any>(null);
@@ -13,6 +39,7 @@ export default function Boards() {
   const [clock, setClock] = useState('');
   const [fullscreen, setFullscreen] = useState(false);
   const [boardMode, setBoardMode] = useState<'normal'|'sbahn'>('normal');
+  const [fontMode, setFontMode] = useState<FontMode>('dbtype');
   const refreshRef = useRef<any>(null);
 
   useEffect(() => {
@@ -21,6 +48,10 @@ export default function Boards() {
     const t = setInterval(tick, 1000);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    document.body.style.fontFamily = FONT_MAP[fontMode];
+  }, [fontMode]);
 
   useEffect(() => {
     const handler = () => {
@@ -75,24 +106,42 @@ export default function Boards() {
     }
   }
 
-  // fullscreen: nur board, kein padding, kein header (header ist sticky aber wir overlayen)
-  const fsStyle: React.CSSProperties = fullscreen ? {
-    position: 'fixed', inset: 0, zIndex: 200,
-    background: '#003189',
-    overflow: 'hidden',
-    display: 'flex', flexDirection: 'column',
-  } : {};
+  const exitBtn = (
+    <button onClick={toggleFullscreen} style={{
+      background:'rgba(255,255,255,0.15)',border:'none',color:'white',
+      padding:'6px 12px',borderRadius:4,cursor:'pointer',fontSize:16
+    }}>✕</button>
+  );
+
+  const fsBtn = (
+    <button className="btn-outline" onClick={toggleFullscreen} title="Vollbild">⛶</button>
+  );
+
+  const fontToggle = (
+    <div style={{display:'flex',gap:4}}>
+      {(['default','dbtype','bahnschrift'] as FontMode[]).map(f => (
+        <button key={f} onClick={() => setFontMode(f)} style={{
+          background: fontMode===f ? 'rgba(255,255,255,0.25)' : 'rgba(255,255,255,0.08)',
+          border:'1px solid rgba(255,255,255,0.2)',color:'white',
+          padding:'4px 10px',borderRadius:4,cursor:'pointer',fontSize:11,
+          fontFamily: FONT_MAP[f],
+        }}>
+          {f==='default'?'Helvetica':f==='dbtype'?'DB Type':'Bahnschrift'}
+        </button>
+      ))}
+    </div>
+  );
 
   const normalBoard = (
-    <div className="bigboard" style={fullscreen ? {flex:1, borderRadius:0, overflow:'auto'} : {}}>
+    <div className="bigboard" style={fullscreen ? {flex:1,borderRadius:0,overflow:'auto'} : {}}>
       <div className="bb-header">
         <div>
           <div className="bb-label">Abfahrt Departure</div>
           <div className="bb-station">{station?.name}</div>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:16}}>
-          {!fullscreen && <button className="btn-outline" onClick={toggleFullscreen} title="Vollbild">⛶</button>}
-          {fullscreen && <button onClick={toggleFullscreen} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'white',padding:'6px 12px',borderRadius:4,cursor:'pointer',fontSize:16}}>✕</button>}
+        <div style={{display:'flex',alignItems:'center',gap:12}}>
+          {fontToggle}
+          {fullscreen ? exitBtn : fsBtn}
           <div className="bb-clock">{clock}</div>
         </div>
       </div>
@@ -121,19 +170,29 @@ export default function Boards() {
         const track = dep.platform || dep.plannedPlatform || '–';
         const trackChanged = dep.platform && dep.platform !== dep.plannedPlatform;
         const allStops = dep.nextStopovers || [];
-        const viaStops = allStops.slice(1, -1).map((s:any) => s.stop?.name).filter(Boolean);
+        const viaStops = allStops
+          .slice(1, -1)
+          .filter((s: any) => isRelevantStop(s))
+          .slice(0, 4)
+          .map((s: any) => s.stop?.name)
+          .filter(Boolean);
         const via = viaStops.join(' – ');
         const color = getLineColor(dep.line, city);
 
         return (
           <div key={i} className={`bb-row ${cancelled?'cancelled':''}`}>
             <div className="bb-time-col">
-              {cancelled ? <span className="bb-time" style={{color:'#ff6b6b'}}>{tP}</span>
-              : hasDelay ? <><span className="bb-time-old">{tP}</span><span className={`bb-time-new ${(delay||0)>5?'heavy':'slight'}`}>{tR}</span></>
-              : <span className="bb-time">{tP}</span>}
+              {cancelled
+                ? <span className="bb-time" style={{color:'#ff6b6b'}}>{tP}</span>
+                : hasDelay
+                  ? <><span className="bb-time-old">{tP}</span><span className={`bb-time-new ${(delay||0)>5?'heavy':'slight'}`}>{tR}</span></>
+                  : <span className="bb-time">{tP}</span>}
             </div>
             <div>
-              <span className="line-badge" style={{background:color.bg,color:color.text,border:color.bg==='#ffffff'?'1px solid #ccc':'none'}}>
+              <span className="line-badge" style={{
+                background:color.bg, color:color.text,
+                border:color.bg==='#ffffff'?'1px solid #ccc':'none'
+              }}>
                 {dep.line?.name||'?'}
               </span>
             </div>
@@ -151,7 +210,8 @@ export default function Boards() {
 
   const sbahnBoard = (
     <div style={{
-      background:'#003189', borderRadius: fullscreen ? 0 : 8,
+      background:'#003189',
+      borderRadius: fullscreen ? 0 : 8,
       overflow: fullscreen ? 'auto' : 'hidden',
       maxWidth: fullscreen ? '100%' : 400,
       width: fullscreen ? '100%' : undefined,
@@ -163,8 +223,8 @@ export default function Boards() {
           <div style={{fontSize:18,fontWeight:700,color:'white'}}>{station?.name}</div>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
-          {!fullscreen && <button className="btn-outline" onClick={toggleFullscreen} title="Vollbild">⛶</button>}
-          {fullscreen && <button onClick={toggleFullscreen} style={{background:'rgba(255,255,255,0.15)',border:'none',color:'white',padding:'6px 12px',borderRadius:4,cursor:'pointer',fontSize:16}}>✕</button>}
+          {fontToggle}
+          {fullscreen ? exitBtn : fsBtn}
           <div style={{fontSize:24,fontWeight:700,fontFamily:'monospace',color:'white'}}>{clock.substring(0,5)}</div>
         </div>
       </div>
@@ -182,7 +242,12 @@ export default function Boards() {
         const track = dep.platform || dep.plannedPlatform || '–';
         const color = getLineColor(dep.line, city);
         const allStops = dep.nextStopovers || [];
-        const viaStops = allStops.slice(1, -1).map((s:any) => s.stop?.name).filter(Boolean);
+        const viaStops = allStops
+          .slice(1, -1)
+          .filter((s: any) => isRelevantStop(s))
+          .slice(0, 3)
+          .map((s: any) => s.stop?.name)
+          .filter(Boolean);
         const via = viaStops.join(' · ');
 
         return (
@@ -215,14 +280,17 @@ export default function Boards() {
 
   return (
     <>
-      {/* fullscreen overlay */}
       {fullscreen && (
-        <div style={fsStyle}>
+        <div style={{
+          position:'fixed', inset:0, zIndex:200,
+          background:'#003189',
+          display:'flex', flexDirection:'column',
+          overflow:'hidden',
+        }}>
           {boardMode === 'normal' ? normalBoard : sbahnBoard}
         </div>
       )}
 
-      {/* normaler modus */}
       {!fullscreen && (
         <div className="container">
           <div className="search-bar">
@@ -238,15 +306,17 @@ export default function Boards() {
           {station && !loading && (
             <>
               <div style={{display:'flex',gap:8,marginBottom:12}}>
-                <button className={`bb-tab ${boardMode==='normal'?'active':''}`} onClick={()=>setBoardMode('normal')}
-                  style={{background: boardMode==='normal'?'#003189':'#002070',border:'1px solid #3a5adb',color:'white',padding:'6px 16px',borderRadius:4,fontSize:13,cursor:'pointer'}}>
-                  📋 Megaboard
-                </button>
+                <button onClick={()=>setBoardMode('normal')} style={{
+                  background: boardMode==='normal'?'#003189':'#002070',
+                  border:'1px solid #3a5adb',color:'white',
+                  padding:'6px 16px',borderRadius:4,fontSize:13,cursor:'pointer'
+                }}>📋 Megaboard</button>
                 {sbahnDeps.length > 0 && (
-                  <button className={`bb-tab ${boardMode==='sbahn'?'active':''}`} onClick={()=>setBoardMode('sbahn')}
-                    style={{background: boardMode==='sbahn'?'#003189':'#002070',border:'1px solid #3a5adb',color:'white',padding:'6px 16px',borderRadius:4,fontSize:13,cursor:'pointer'}}>
-                    🚇 S-Bahn Hochkant
-                  </button>
+                  <button onClick={()=>setBoardMode('sbahn')} style={{
+                    background: boardMode==='sbahn'?'#003189':'#002070',
+                    border:'1px solid #3a5adb',color:'white',
+                    padding:'6px 16px',borderRadius:4,fontSize:13,cursor:'pointer'
+                  }}>🚇 S-Bahn Hochkant</button>
                 )}
               </div>
 
