@@ -32,6 +32,27 @@ export function delayMin(planned?: string, real?: string): number | null {
 }
 
 export async function getDepartures(id: string, results = 60, duration = 90) {
-  const data = await get(`/stops/${id}/departures?results=${results}&duration=${duration}&language=de&stopovers=true`);
-  return (data.departures || data) as any[];
+  // stopovers=true entfernt — wird von /departures nicht supported
+  const data = await get(`/stops/${id}/departures?results=${results}&duration=${duration}&language=de`);
+  const deps = (data.departures || data) as any[];
+
+  // stopovers nachladen: parallel, max 15 züge (performance)
+  const toFetch = deps.slice(0, 15).filter((d: any) => d.tripId);
+  const tripMap = new Map<string, any[]>();
+
+  await Promise.allSettled(
+    toFetch.map(async (dep: any) => {
+      try {
+        const trip = await getTripDetails(dep.tripId);
+        const stopovers = trip?.stopovers || [];
+        tripMap.set(dep.tripId, stopovers);
+      } catch {}
+    })
+  );
+
+  // stopovers in deps einbauen
+  return deps.map((dep: any) => ({
+    ...dep,
+    nextStopovers: tripMap.get(dep.tripId) || [],
+  }));
 }
