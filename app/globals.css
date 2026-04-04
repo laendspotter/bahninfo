@@ -1,3 +1,17 @@
+@import url('https://fonts.bunny.net/css?family=db-type:400,700');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ... rest bleibt gleich ... */
+}
+
+html, body { height: 100%; }
+body { 
+  background: var(--dark); 
+  color: var(--text); 
+  font-family: 'DB Type', 'Helvetica Neue', Arial, sans-serif; 
+}
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
