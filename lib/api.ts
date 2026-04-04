@@ -36,8 +36,8 @@ export async function getDepartures(id: string, results = 60, duration = 90) {
   const data = await get(`/stops/${id}/departures?results=${results}&duration=${duration}&language=de`);
   const deps = (data.departures || data) as any[];
 
-  // stopovers nachladen: parallel, max 15 züge (performance)
-  const toFetch = deps.slice(0, 15).filter((d: any) => d.tripId);
+  // stopovers nachladen: parallel, max 40 züge (performance)
+  const toFetch = deps.slice(0, 40).filter((d: any) => d.tripId);
   const tripMap = new Map<string, any[]>();
 
   await Promise.allSettled(
